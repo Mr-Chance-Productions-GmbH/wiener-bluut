@@ -19,10 +19,10 @@ login: ## Authenticate the Netlify CLI (opens a browser)
 	$(NETLIFY) login
 
 preview: ## Deploy a draft and print a temporary obscure URL (for feedback)
-	$(NETLIFY) deploy --dir=$(SITE_DIR)
+	$(NETLIFY) deploy
 
 deploy: ## Deploy to the site's stable production URL
-	$(NETLIFY) deploy --dir=$(SITE_DIR) --prod
+	$(NETLIFY) deploy --prod
 
 status: ## Show the linked Netlify site and account
 	$(NETLIFY) status
