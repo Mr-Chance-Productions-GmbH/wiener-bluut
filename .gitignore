@@ -29,3 +29,6 @@ build/
 
 # Logs
 *.log
+
+# Netlify (local link/state — keep out of git)
+.netlify/
