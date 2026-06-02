@@ -13,7 +13,7 @@ build, no runner). Pushing to `main` is the deploy.
 
 - `docs/content.json` is the single source of truth; `docs/js/app.js` renders it
   client-side.
-- Edits are made with the local **Setzer** tool (`site_dir = docs`,
+- Edits are made with the local [**Setzer**](https://github.com/crux/setzer) tool (`site_dir = docs`,
   `content_path = docs/content.json`): its in-page editor publishes changes back
   here as commits, which Pages then serves. No CMS, no backend.
 
