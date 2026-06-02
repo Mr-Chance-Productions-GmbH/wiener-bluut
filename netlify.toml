@@ -1,4 +1,0 @@
-# Netlify configuration — single source of truth for deploy settings.
-# Static site, no build step; publish the site/ folder as-is.
-[build]
-  publish = "site"
