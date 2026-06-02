@@ -1,27 +1,41 @@
 /* =============================================================
    WIENER BLUUT — Rendering + Editor
-   Renders the page from window.SITE_CONTENT, supports a simple
-   in-browser edit mode (#edit) with localStorage + JSON export.
+   Renders the page from content.json. In edit mode (#edit) the
+   content is published back through the local Setzer tool, which
+   commits it to the site's Git repository.
    ============================================================= */
 (function () {
   "use strict";
 
-  var STORE_KEY = "wienerbluut_content_v1";
   var MONTHS = ["Jän", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
 
-  // -- load content: localStorage override > content.js default
-  var DEFAULT = window.SITE_CONTENT;
-  var data = loadContent();
+  // content.json is the single source of truth, fetched at load.
+  var CONTENT_URL = "content.json";
+  // Setzer's local save endpoint (only present when the Setzer tool is running).
+  var SAVE_URL = "/__save";
+  var data = {};
 
-  function loadContent() {
-    try {
-      var saved = localStorage.getItem(STORE_KEY);
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return JSON.parse(JSON.stringify(DEFAULT));
+  function load() {
+    return fetch(CONTENT_URL, { cache: "no-store" }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (json) { data = json; });
   }
-  function persist() {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch (e) {}
+
+  // publish sends the current content to the local Setzer tool, which commits
+  // and pushes it. Resolves with the server's JSON response.
+  function publish() {
+    return fetch(SAVE_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data)
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (body) {
+        if (r.status === 409) throw new Error("conflict");
+        if (!r.ok) throw new Error((body && body.error) || ("HTTP " + r.status));
+        return body;
+      });
+    });
   }
 
   // -- helpers
@@ -253,19 +267,28 @@
       '<div class="editor-head"><h3>Inhalte bearbeiten</h3><button class="close" aria-label="Schließen">&times;</button></div>' +
       '<div class="editor-body"></div>' +
       '<div class="editor-foot">' +
-        '<button class="btn btn-primary" data-act="save">Speichern &amp; Vorschau</button>' +
-        '<button class="btn btn-ghost" data-act="export">content.js herunterladen</button>' +
-        '<button class="btn btn-ghost" data-act="reset">Zurücksetzen</button>' +
+        '<button class="btn btn-primary" data-act="save">Veröffentlichen</button>' +
+        '<button class="btn btn-ghost" data-act="reset">Verwerfen</button>' +
       '</div>';
     document.body.appendChild(backdrop);
     document.body.appendChild(editor);
     backdrop.addEventListener("click", closeEditor);
     editor.querySelector(".close").addEventListener("click", closeEditor);
-    editor.querySelector('[data-act="save"]').addEventListener("click", function () { persist(); render(); toast("Gespeichert — Vorschau aktualisiert"); });
-    editor.querySelector('[data-act="export"]').addEventListener("click", exportContent);
+    editor.querySelector('[data-act="save"]').addEventListener("click", function () {
+      render(); // optimistic preview
+      var btn = editor.querySelector('[data-act="save"]');
+      btn.disabled = true;
+      publish().then(function (res) {
+        toast("Veröffentlicht — in ~1 Min. live" + (res && res.commit ? " (" + String(res.commit).slice(0, 7) + ")" : ""));
+      }).catch(function (e) {
+        if (e.message === "conflict") toast("Inhalt wurde zwischenzeitlich geändert — bitte neu laden.");
+        else toast("Veröffentlichen fehlgeschlagen: " + e.message + " (läuft Setzer?)");
+      }).then(function () { btn.disabled = false; });
+    });
     editor.querySelector('[data-act="reset"]').addEventListener("click", function () {
-      if (confirm("Alle Änderungen verwerfen und Originalinhalte laden?")) {
-        localStorage.removeItem(STORE_KEY); data = JSON.parse(JSON.stringify(DEFAULT)); render(); buildEditorBody(currentTab); toast("Zurückgesetzt");
+      if (confirm("Ungespeicherte Änderungen verwerfen und neu laden?")) {
+        load().then(function () { render(); buildEditorBody(currentTab); toast("Neu geladen"); })
+              .catch(function (e) { toast("Neu laden fehlgeschlagen: " + e.message); });
       }
     });
   }
@@ -308,7 +331,7 @@
   }
 
   function buildTermineEditor(c) {
-    c.innerHTML = '<p class="ed-hint">Termine hinzufügen, bearbeiten oder entfernen. Datum im Format JJJJ-MM-TT. Speichern aktualisiert die Vorschau; „content.js herunterladen“ erzeugt die Datei für die Website.</p>';
+    c.innerHTML = '<p class="ed-hint">Termine hinzufügen, bearbeiten oder entfernen. Datum im Format JJJJ-MM-TT. „Veröffentlichen“ speichert die Änderungen und stellt sie online.</p>';
     var list = el("div");
     data.termine.events.forEach(function (e, i) {
       var g = el("div", { class: "ed-group" });
@@ -389,17 +412,6 @@
     if (e) e.classList.remove("open");
   }
 
-  function exportContent() {
-    var js = "/* Wiener Bluut — content.js (exportiert " + new Date().toLocaleDateString("de-DE") + ") */\n" +
-             "window.SITE_CONTENT = " + JSON.stringify(data, null, 2) + ";\n";
-    var blob = new Blob([js], { type: "text/javascript" });
-    var url = URL.createObjectURL(blob);
-    var a = el("a", { href: url, download: "content.js" });
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-    toast("content.js heruntergeladen — ersetzen Sie die Datei im Ordner js/");
-  }
-
   // -- toast
   var toastTimer;
   function toast(msg) {
@@ -411,7 +423,12 @@
   }
 
   // ============================================================
-  render();
-  if (location.hash === "#edit") openEditor();
+  load().then(function () {
+    render();
+    if (location.hash === "#edit") openEditor();
+  }).catch(function (e) {
+    document.body.innerHTML = '<p style="padding:48px;font-family:sans-serif;color:#7a2d28">' +
+      'Inhalt konnte nicht geladen werden (' + esc(e.message) + ').</p>';
+  });
   window.addEventListener("hashchange", function () { if (location.hash === "#edit") openEditor(); });
 })();
