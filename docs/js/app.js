@@ -228,6 +228,15 @@
     });
   }
 
+  var primaryWired = false;
+  // The edit button is enabled only in the primary tab (single active editor).
+  function syncEditButton(isPrimary) {
+    var btn = document.getElementById("open-editor");
+    if (!btn) return;
+    btn.disabled = !isPrimary;
+    btn.textContent = isPrimary ? "Inhalte bearbeiten" : "In anderem Tab geöffnet";
+  }
+
   function renderFooter() {
     var f = data.footer;
     var links = f.links.map(function (l) { return '<a href="' + esc(l.href) + '">' + esc(l.label) + '</a>'; }).join("");
@@ -238,7 +247,15 @@
       '<div><div class="f-brand">' + uu(data.site.name) + '</div><div class="f-note">' + esc(f.note) + '</div>' +
       editBtn + '</div>' +
       '<div class="f-links">' + links + '</div>';
-    if (window.Setzer) document.getElementById("open-editor").addEventListener("click", openEditor);
+    if (window.Setzer) {
+      var openBtn = document.getElementById("open-editor");
+      openBtn.addEventListener("click", function () {
+        if (window.Setzer.isPrimary()) openEditor();
+        else toast("Setzer ist bereits in einem anderen Tab geöffnet — dort bearbeiten.");
+      });
+      syncEditButton(window.Setzer.isPrimary());
+      if (!primaryWired) { primaryWired = true; window.Setzer.onPrimary(syncEditButton); }
+    }
   }
 
   // ============================================================
