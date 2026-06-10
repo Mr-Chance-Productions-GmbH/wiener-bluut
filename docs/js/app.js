@@ -11,8 +11,6 @@
 
   // content.json is the single source of truth, fetched at load.
   var CONTENT_URL = "content.json";
-  // Setzer's local save endpoint (only present when the Setzer tool is running).
-  var SAVE_URL = "/__save";
   var data = {};
 
   function load() {
@@ -20,26 +18,6 @@
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.json();
     }).then(function (json) { data = json; });
-  }
-
-  // publish sends the current content to the local Setzer tool, which commits
-  // and pushes it. Resolves with the server's JSON response.
-  function publish() {
-    return fetch(SAVE_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data)
-    }).then(function (r) {
-      return r.json().catch(function () { return {}; }).then(function (body) {
-        if (r.status === 409) {
-          var ce = new Error((body && body.error) || "Inhalt wurde zwischenzeitlich geändert.");
-          ce.conflict = body || {};
-          throw ce;
-        }
-        if (!r.ok) throw new Error((body && body.error) || ("HTTP " + r.status));
-        return body;
-      });
-    });
   }
 
   // -- helpers
@@ -253,11 +231,14 @@
   function renderFooter() {
     var f = data.footer;
     var links = f.links.map(function (l) { return '<a href="' + esc(l.href) + '">' + esc(l.label) + '</a>'; }).join("");
+    // The edit affordance only exists when served by Setzer (window.Setzer);
+    // on GitHub Pages there's no editor at all.
+    var editBtn = window.Setzer ? '<button class="f-edit" id="open-editor">Inhalte bearbeiten</button>' : '';
     document.querySelector(".site-footer .wrap").innerHTML =
       '<div><div class="f-brand">' + uu(data.site.name) + '</div><div class="f-note">' + esc(f.note) + '</div>' +
-      '<button class="f-edit" id="open-editor">Inhalte bearbeiten</button></div>' +
+      editBtn + '</div>' +
       '<div class="f-links">' + links + '</div>';
-    document.getElementById("open-editor").addEventListener("click", openEditor);
+    if (window.Setzer) document.getElementById("open-editor").addEventListener("click", openEditor);
   }
 
   // ============================================================
@@ -282,7 +263,7 @@
       render(); // optimistic preview
       var btn = editor.querySelector('[data-act="save"]');
       btn.disabled = true;
-      publish().then(function (res) {
+      window.Setzer.publish(data).then(function (res) {
         toast("Veröffentlicht — in ~1 Min. live" + (res && res.commit ? " (" + String(res.commit).slice(0, 7) + ")" : ""));
       }).catch(function (e) {
         if (e.conflict) {
