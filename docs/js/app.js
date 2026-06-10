@@ -280,7 +280,9 @@
       render(); // optimistic preview
       var btn = editor.querySelector('[data-act="save"]');
       btn.disabled = true;
-      window.Setzer.publish(data).then(function (res) {
+      window.Setzer.publish([
+        { path: CONTENT_URL, content: JSON.stringify(data, null, 2) + "\n" }
+      ]).then(function (res) {
         toast("Veröffentlicht — in ~1 Min. live" + (res && res.commit ? " (" + String(res.commit).slice(0, 7) + ")" : ""));
       }).catch(function (e) {
         if (e.conflict) {
