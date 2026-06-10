@@ -31,7 +31,11 @@
       body: JSON.stringify(data)
     }).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (body) {
-        if (r.status === 409) throw new Error("conflict");
+        if (r.status === 409) {
+          var ce = new Error((body && body.error) || "Inhalt wurde zwischenzeitlich geändert.");
+          ce.conflict = body || {};
+          throw ce;
+        }
         if (!r.ok) throw new Error((body && body.error) || ("HTTP " + r.status));
         return body;
       });
@@ -281,8 +285,14 @@
       publish().then(function (res) {
         toast("Veröffentlicht — in ~1 Min. live" + (res && res.commit ? " (" + String(res.commit).slice(0, 7) + ")" : ""));
       }).catch(function (e) {
-        if (e.message === "conflict") toast("Inhalt wurde zwischenzeitlich geändert — bitte neu laden.");
-        else toast("Veröffentlichen fehlgeschlagen: " + e.message + " (läuft Setzer?)");
+        if (e.conflict) {
+          // Setzer offloaded the edit to a branch and reverted to the published
+          // version — reload it, and offer the GitHub merge link.
+          load().then(function () { render(); buildEditorBody(currentTab); });
+          toast(e.message, { url: e.conflict.url });
+        } else {
+          toast("Veröffentlichen fehlgeschlagen: " + e.message + " (läuft Setzer?)");
+        }
       }).then(function () { btn.disabled = false; });
     });
     editor.querySelector('[data-act="reset"]').addEventListener("click", function () {
@@ -414,12 +424,21 @@
 
   // -- toast
   var toastTimer;
-  function toast(msg) {
+  function toast(msg, opts) {
+    opts = opts || {};
     var t = document.getElementById("toast");
     if (!t) { t = el("div", { class: "toast", id: "toast" }); document.body.appendChild(t); }
-    t.textContent = msg; t.classList.add("show");
+    t.onclick = null; t.style.cursor = "";
+    if (opts.url) {
+      t.textContent = msg + "  ↗ auf GitHub zusammenführen";
+      t.style.cursor = "pointer";
+      t.onclick = function () { window.open(opts.url, "_blank", "noopener"); };
+    } else {
+      t.textContent = msg;
+    }
+    t.classList.add("show");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 3200);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, opts.url ? 12000 : 3200);
   }
 
   // ============================================================
