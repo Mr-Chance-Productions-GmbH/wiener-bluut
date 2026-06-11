@@ -17,7 +17,19 @@
     return fetch(CONTENT_URL, { cache: "no-store" }).then(function (r) {
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.json();
-    }).then(function (json) { data = json; });
+    }).then(function (json) { data = normalizeImages(json); });
+  }
+
+  // Image fields may be a plain label (legacy) or { src, alt }. Normalise to
+  // { src, alt } so the renderer and editor treat them uniformly.
+  function toImage(v) {
+    return (v && typeof v === "object") ? { src: v.src || "", alt: v.alt || "" } : { src: "", alt: v || "" };
+  }
+  function normalizeImages(d) {
+    if (d.hero) d.hero.image = toImage(d.hero.image);
+    if (d.about && d.about.members) d.about.members.forEach(function (m) { m.image = toImage(m.image); });
+    if (d.galerie && d.galerie.images) d.galerie.images = d.galerie.images.map(toImage);
+    return d;
   }
 
   // -- helpers
@@ -36,6 +48,14 @@
   function uu(s) { return esc(s).replace(/uu/g, '<span class="uu">uu</span>'); }
   function ph(label, cls) {
     return '<div class="ph ' + (cls || "") + '"><span class="ph-label">' + esc(label) + '</span></div>';
+  }
+
+  // imgOrPh renders an <img> when the image has a src, else the placeholder.
+  function imgOrPh(image, cls) {
+    if (image && image.src) {
+      return '<img class="' + (cls || "") + '" src="' + esc(image.src) + '" alt="' + esc(image.alt || "") + '" loading="lazy">';
+    }
+    return ph((image && image.alt) || "", cls);
   }
 
   // ============================================================
@@ -88,7 +108,9 @@
             '<a class="btn btn-ghost" href="' + esc(h.secondaryCta.href) + '">' + esc(h.secondaryCta.label) + '</a>' +
           '</div>' +
         '</div>' +
-        '<div class="hero-portrait ph on-dark"><span class="ph-label">' + esc(h.image) + '</span></div>' +
+        (h.image && h.image.src
+          ? '<div class="hero-portrait on-dark"><img src="' + esc(h.image.src) + '" alt="' + esc(h.image.alt || "") + '"></div>'
+          : '<div class="hero-portrait ph on-dark"><span class="ph-label">' + esc(h.image.alt || "") + '</span></div>') +
       '</div>';
   }
 
@@ -96,7 +118,7 @@
     var a = data.about;
     var paras = a.paragraphs.map(function (p) { return '<p>' + esc(p) + '</p>'; }).join("");
     var members = a.members.map(function (m) {
-      return '<div class="member">' + ph(m.image) +
+      return '<div class="member">' + imgOrPh(m.image) +
         '<div><div class="m-name">' + esc(m.name) + '</div>' +
         '<div class="m-role">' + esc(m.role) + '</div>' +
         '<div class="m-note">' + esc(m.note) + '</div></div></div>';
@@ -174,7 +196,7 @@
 
   function renderGalerie() {
     var g = data.galerie;
-    var imgs = g.images.map(function (label) { return ph(label); }).join("");
+    var imgs = g.images.map(function (image) { return imgOrPh(image); }).join("");
     document.getElementById("galerie").innerHTML =
       '<div class="wrap">' +
         '<div class="head"><p class="section-label">' + esc(g.label) + '</p><h2>' + esc(g.title) + '</h2></div>' +
@@ -280,9 +302,10 @@
       render(); // optimistic preview
       var btn = editor.querySelector('[data-act="save"]');
       btn.disabled = true;
-      window.Setzer.publish([
-        { path: CONTENT_URL, content: JSON.stringify(data, null, 2) + "\n" }
-      ]).then(function (res) {
+      var files = [{ path: CONTENT_URL, content: JSON.stringify(data, null, 2) + "\n" }];
+      Object.keys(pendingImages).forEach(function (p) { files.push({ path: p, content: pendingImages[p] }); });
+      window.Setzer.publish(files).then(function (res) {
+        clearPendingImages();
         toast("Veröffentlicht — in ~1 Min. live" + (res && res.commit ? " (" + String(res.commit).slice(0, 7) + ")" : ""));
       }).catch(function (e) {
         if (e.conflict) {
@@ -309,6 +332,7 @@
     { id: "programm", label: "Programm" },
     { id: "stimmen", label: "Stimmen" },
     { id: "texte", label: "Texte" },
+    { id: "bilder", label: "Bilder" },
     { id: "kontakt", label: "Kontakt" }
   ];
 
@@ -327,6 +351,7 @@
     else if (tab === "programm") buildListEditor(c, data.programm.items, ["title", "text"], { title: "Titel", text: "Beschreibung" }, "Programmpunkt", "Wiener Lieder");
     else if (tab === "stimmen") buildListEditor(c, data.stimmen.quotes, ["text", "author"], { text: "Zitat", author: "Name" }, "Stimme", "");
     else if (tab === "texte") buildTexteEditor(c);
+    else if (tab === "bilder") buildBilderEditor(c);
     else if (tab === "kontakt") buildKontaktEditor(c);
   }
 
@@ -420,6 +445,143 @@
     var b = document.querySelector(".editor-backdrop"), e = document.querySelector(".editor");
     if (b) b.classList.remove("open");
     if (e) e.classList.remove("open");
+  }
+
+  // ============================================================
+  //  IMAGES — pick, crop, hold for the next publish
+  // ============================================================
+  var pendingImages = {}; // path -> Blob (with ._url for preview), sent on publish
+
+  // Per-slot geometry: crop aspect (w/h), output max width, preview class.
+  var IMG_SPECS = {
+    hero:    { aspect: 4 / 5, maxW: 900,  cls: "" },
+    member:  { aspect: 1,     maxW: 500,  cls: "square" },
+    gallery: { aspect: 4 / 3, maxW: 1100, cls: "wide" }
+  };
+
+  function clearPendingImages() {
+    Object.keys(pendingImages).forEach(function (p) {
+      if (pendingImages[p]._url) URL.revokeObjectURL(pendingImages[p]._url);
+    });
+    pendingImages = {};
+  }
+
+  // imageControl builds a DOM widget for one image slot. `image` is the {src,alt}
+  // object (mutated in place); `path` is the web-relative file path; `spec` is
+  // from IMG_SPECS. On crop it stores the blob in pendingImages[path] and points
+  // image.src at the path (cache-busted).
+  function imageControl(image, path, spec) {
+    var preview = el("div");
+    function draw() {
+      var url = (pendingImages[path] && pendingImages[path]._url) || image.src || "";
+      preview.innerHTML = url
+        ? '<img class="ed-thumb ' + spec.cls + '" src="' + esc(url) + '" alt="">'
+        : '<div class="ed-thumb ' + spec.cls + ' ph"><span>' + esc(image.alt || "Kein Bild") + '</span></div>';
+    }
+    draw();
+    var input = el("input", { type: "file", accept: "image/*", style: "display:none" });
+    var pick = el("button", { class: "btn btn-ghost ed-pick", text: image.src ? "Bild ersetzen" : "Bild wählen" });
+    pick.addEventListener("click", function () { input.click(); });
+    input.addEventListener("change", function () {
+      var file = input.files && input.files[0];
+      input.value = "";
+      if (!file) return;
+      openCropper(file, spec.aspect, spec.maxW, function (blob) {
+        if (pendingImages[path] && pendingImages[path]._url) URL.revokeObjectURL(pendingImages[path]._url);
+        blob._url = URL.createObjectURL(blob);
+        pendingImages[path] = blob;
+        image.src = path + "?v=" + Date.now(); // cache-bust; the committed file is `path`
+        pick.textContent = "Bild ersetzen";
+        draw();
+      });
+    });
+    return el("div", { class: "ed-image" }, [preview, pick, input]);
+  }
+
+  // openCropper shows a drag + zoom crop modal at the target aspect, then exports
+  // a WebP Blob at maxW. Pure canvas, no dependency.
+  function openCropper(file, aspect, maxW, onDone) {
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      var fw = Math.min(360, window.innerWidth - 90);
+      var fh = Math.round(fw / aspect);
+      var minScale = Math.max(fw / img.naturalWidth, fh / img.naturalHeight);
+      var scale = minScale;
+      var ox = (fw - img.naturalWidth * scale) / 2;
+      var oy = (fh - img.naturalHeight * scale) / 2;
+
+      var imgEl = el("img", { src: url });
+      var frame = el("div", { class: "cropper-frame" }, [imgEl]);
+      frame.style.width = fw + "px"; frame.style.height = fh + "px";
+      var zoom = el("input", { type: "range", min: "1", max: "4", step: "0.01", value: "1" });
+      var cancel = el("button", { class: "btn btn-ghost", text: "Abbrechen" });
+      var ok = el("button", { class: "btn btn-primary", text: "Übernehmen" });
+      var modal = el("div", { class: "cropper" }, [
+        el("div", { class: "cropper-box" }, [
+          frame,
+          el("div", { class: "cropper-ctrls" }, [el("span", { text: "Zoom" }), zoom]),
+          el("div", { class: "cropper-actions" }, [cancel, ok])
+        ])
+      ]);
+      document.body.appendChild(modal);
+
+      function apply() {
+        var w = img.naturalWidth * scale, h = img.naturalHeight * scale;
+        ox = Math.min(0, Math.max(fw - w, ox));
+        oy = Math.min(0, Math.max(fh - h, oy));
+        imgEl.style.transform = "translate(" + ox + "px," + oy + "px) scale(" + scale + ")";
+      }
+      apply();
+
+      zoom.addEventListener("input", function () {
+        var prev = scale;
+        scale = minScale * parseFloat(zoom.value);
+        ox = fw / 2 - (fw / 2 - ox) * (scale / prev);
+        oy = fh / 2 - (fh / 2 - oy) * (scale / prev);
+        apply();
+      });
+
+      var drag = null;
+      frame.addEventListener("pointerdown", function (e) {
+        drag = { x: e.clientX, y: e.clientY, ox: ox, oy: oy };
+        frame.classList.add("grabbing");
+        frame.setPointerCapture(e.pointerId);
+      });
+      frame.addEventListener("pointermove", function (e) {
+        if (!drag) return;
+        ox = drag.ox + (e.clientX - drag.x);
+        oy = drag.oy + (e.clientY - drag.y);
+        apply();
+      });
+      frame.addEventListener("pointerup", function () { drag = null; frame.classList.remove("grabbing"); });
+
+      function close() { document.body.removeChild(modal); URL.revokeObjectURL(url); }
+      cancel.addEventListener("click", close);
+      ok.addEventListener("click", function () {
+        var th = Math.round(maxW / aspect);
+        var canvas = el("canvas");
+        canvas.width = maxW; canvas.height = th;
+        canvas.getContext("2d").drawImage(img, -ox / scale, -oy / scale, fw / scale, fh / scale, 0, 0, maxW, th);
+        canvas.toBlob(function (blob) { close(); if (blob) onDone(blob); }, "image/webp", 0.82);
+      });
+    };
+    img.src = url;
+  }
+
+  function buildBilderEditor(c) {
+    c.innerHTML = '<p class="ed-hint">Fotos hochladen und zuschneiden. „Veröffentlichen“ stellt sie online. Tipp: Querformat-Fotos wirken in der Galerie am besten.</p>';
+    c.appendChild(el("h4", { text: "Bühnenbild" }));
+    c.appendChild(imageControl(data.hero.image, "img/hero.webp", IMG_SPECS.hero));
+    c.appendChild(el("h4", { text: "Das Duo" }));
+    data.about.members.forEach(function (m, i) {
+      c.appendChild(el("div", { class: "ed-sub", text: m.name }));
+      c.appendChild(imageControl(m.image, "img/member-" + (i + 1) + ".webp", IMG_SPECS.member));
+    });
+    c.appendChild(el("h4", { text: "Galerie" }));
+    data.galerie.images.forEach(function (im, i) {
+      c.appendChild(imageControl(im, "img/galerie-" + (i + 1) + ".webp", IMG_SPECS.gallery));
+    });
   }
 
   // -- toast
