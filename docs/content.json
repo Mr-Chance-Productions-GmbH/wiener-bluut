@@ -17,7 +17,10 @@
       "label": "Anfragen",
       "href": "#kontakt"
     },
-    "image": "Foto: Hella Duny & Klaus Schäfer auf der Bühne"
+    "image": {
+      "src": "img/hero.webp?v=1781254247552",
+      "alt": "Foto: Hella Duny & Klaus Schäfer auf der Bühne"
+    }
   },
   "about": {
     "label": "Das Duo",
@@ -32,13 +35,19 @@
         "name": "Hella Duny",
         "role": "Gesang",
         "note": "Gebürtige Wienerin · Charme & Schmäh",
-        "image": "Foto: Hella Duny"
+        "image": {
+          "src": "img/member-1.webp?v=1781254378291",
+          "alt": "Foto: Hella Duny"
+        }
       },
       {
         "name": "Klaus Schäfer",
         "role": "Klavier & zweite Stimme",
         "note": "Vollblutpianist",
-        "image": "Foto: Klaus Schäfer"
+        "image": {
+          "src": "img/member-2.webp?v=1781254387357",
+          "alt": "Foto: Klaus Schäfer"
+        }
       }
     ]
   },
@@ -143,12 +152,30 @@
     "label": "Galerie",
     "title": "Bühne & Backstage",
     "images": [
-      "Foto: Auftritt — Querformat",
-      "Foto: Hella am Mikrofon",
-      "Foto: Klaus am Klavier",
-      "Foto: Publikum / Saal",
-      "Foto: Detail — Hut & Federboa",
-      "Foto: Duo Porträt"
+      {
+        "src": "",
+        "alt": "Foto: Auftritt — Querformat"
+      },
+      {
+        "src": "",
+        "alt": "Foto: Hella am Mikrofon"
+      },
+      {
+        "src": "",
+        "alt": "Foto: Klaus am Klavier"
+      },
+      {
+        "src": "",
+        "alt": "Foto: Publikum / Saal"
+      },
+      {
+        "src": "",
+        "alt": "Foto: Detail — Hut & Federboa"
+      },
+      {
+        "src": "",
+        "alt": "Foto: Duo Porträt"
+      }
     ]
   },
   "kontakt": {
