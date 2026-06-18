@@ -250,15 +250,6 @@
     });
   }
 
-  var primaryWired = false;
-  // The edit button is enabled only in the primary tab (single active editor).
-  function syncEditButton(isPrimary) {
-    var btn = document.getElementById("open-editor");
-    if (!btn) return;
-    btn.disabled = !isPrimary;
-    btn.textContent = isPrimary ? "Inhalte bearbeiten" : "In anderem Tab geöffnet";
-  }
-
   function renderFooter() {
     var f = data.footer;
     var links = f.links.map(function (l) { return '<a href="' + esc(l.href) + '">' + esc(l.label) + '</a>'; }).join("");
@@ -270,13 +261,8 @@
       editBtn + '</div>' +
       '<div class="f-links">' + links + '</div>';
     if (window.Setzer) {
-      var openBtn = document.getElementById("open-editor");
-      openBtn.addEventListener("click", function () {
-        if (window.Setzer.isPrimary()) openEditor();
-        else toast("Setzer ist bereits in einem anderen Tab geöffnet — dort bearbeiten.");
-      });
-      syncEditButton(window.Setzer.isPrimary());
-      if (!primaryWired) { primaryWired = true; window.Setzer.onPrimary(syncEditButton); }
+      document.getElementById("open-editor").addEventListener("click", openEditor);
+      window.Setzer.onEditorStolen(handleStolen);
     }
   }
 
@@ -436,6 +422,12 @@
   }
 
   function openEditor() {
+    if (!(window.Setzer && window.Setzer.beginEdit)) { doOpenEditor(); return; }
+    window.Setzer.beginEdit(doOpenEditor, function (steal) {
+      if (confirm("Ein Editor ist bereits in einem anderen Tab geöffnet.\n\nTrotzdem hier übernehmen? Nicht gespeicherte Änderungen im anderen Tab gehen verloren.")) steal();
+    });
+  }
+  function doOpenEditor() {
     buildEditorShell();
     buildEditorBody(currentTab);
     document.querySelector(".editor-backdrop").classList.add("open");
@@ -445,6 +437,12 @@
     var b = document.querySelector(".editor-backdrop"), e = document.querySelector(".editor");
     if (b) b.classList.remove("open");
     if (e) e.classList.remove("open");
+    if (window.Setzer && window.Setzer.endEdit) window.Setzer.endEdit();
+  }
+  // Another tab took over editing — stand down here.
+  function handleStolen() {
+    closeEditor();
+    toast("Bearbeitung in einem anderen Tab übernommen.");
   }
 
   // ============================================================
