@@ -319,6 +319,23 @@ form.booking { display: grid; gap: 16px; }
 .site-footer .f-links a { font-size: 0.82rem; letter-spacing: 0.08em; text-transform: uppercase; color: oklch(0.96 0.012 85 / 0.8); text-decoration: none; }
 .site-footer .f-links a:hover { color: var(--gold); }
 .f-edit { font-size: 0.72rem; color: oklch(0.96 0.012 85 / 0.4); text-decoration: underline; cursor: pointer; background: none; border: 0; font-family: var(--sans); }
+.site-footer .f-legal { display: inline-block; margin-top: 8px; font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: oklch(0.96 0.012 85 / 0.6); text-decoration: none; }
+.site-footer .f-legal:hover { color: var(--gold); }
+
+/* ---------- Rechtliches (Impressum / standalone legal pages) ---------- */
+.legal-back { font-size: 0.82rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); text-decoration: none; }
+.legal-back:hover { color: var(--oxblood); }
+.legal { padding-block: clamp(56px, 9vw, 120px); min-height: 62vh; }
+.legal .wrap { max-width: 760px; }
+.legal h1 { font-size: clamp(2.4rem, 5vw, 3.6rem); margin: 0.2em 0 0.6em; }
+.legal h2 { font-family: var(--serif); font-weight: 600; font-size: 1.25rem; margin: 1.8em 0 0.35em; }
+.legal p, .legal address { color: var(--ink-soft); margin: 0 0 0.5em; }
+.legal address { font-style: normal; line-height: 1.7; }
+.legal a { color: var(--oxblood); text-decoration: none; }
+.legal a:hover { text-decoration: underline; }
+.legal .back { display: inline-block; margin-top: 2.6em; font-size: 0.82rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+.legal .back:hover { color: var(--oxblood); text-decoration: none; }
+.ph-data { background: oklch(0.74 0.09 78 / 0.28); border-bottom: 1px dashed var(--gold-deep); padding: 0 3px; font-style: italic; color: var(--ink); }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 880px) {

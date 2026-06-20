@@ -258,6 +258,7 @@
     var editBtn = window.Setzer ? '<button class="f-edit" id="open-editor">Inhalte bearbeiten</button>' : '';
     document.querySelector(".site-footer .wrap").innerHTML =
       '<div><div class="f-brand">' + uu(data.site.name) + '</div><div class="f-note">' + esc(f.note) + '</div>' +
+      '<a class="f-legal" href="impressum.html">Impressum</a>' +
       editBtn + '</div>' +
       '<div class="f-links">' + links + '</div>';
     if (window.Setzer) {
@@ -319,7 +320,8 @@
     { id: "stimmen", label: "Stimmen" },
     { id: "texte", label: "Texte" },
     { id: "bilder", label: "Bilder" },
-    { id: "kontakt", label: "Kontakt" }
+    { id: "kontakt", label: "Kontakt" },
+    { id: "impressum", label: "Impressum" }
   ];
 
   function buildEditorBody(tab) {
@@ -339,6 +341,7 @@
     else if (tab === "texte") buildTexteEditor(c);
     else if (tab === "bilder") buildBilderEditor(c);
     else if (tab === "kontakt") buildKontaktEditor(c);
+    else if (tab === "impressum") buildImpressumEditor(c);
   }
 
   function fieldRow(label, value, multiline, onInput) {
@@ -419,6 +422,15 @@
     c.appendChild(fieldRow("Telefon", k.phone, false, function (v) { k.phone = v; }));
     c.appendChild(fieldRow("Ort", k.location, false, function (v) { k.location = v; }));
     c.appendChild(fieldRow("Formular-Endpoint (optional)", k.formAction, false, function (v) { k.formAction = v; }));
+  }
+
+  function buildImpressumEditor(c) {
+    c.innerHTML = '<p class="ed-hint">Pflichtangaben nach § 5 DDG. Diese Daten erscheinen auf der Impressum-Seite. Die E-Mail wird aus dem Tab „Kontakt“ übernommen.</p>';
+    var im = data.impressum || (data.impressum = { name: "", street: "", city: "", phone: "" });
+    c.appendChild(fieldRow("Name (verantwortliche Person)", im.name, false, function (v) { im.name = v; }));
+    c.appendChild(fieldRow("Straße und Hausnummer", im.street, false, function (v) { im.street = v; }));
+    c.appendChild(fieldRow("PLZ und Ort", im.city, false, function (v) { im.city = v; }));
+    c.appendChild(fieldRow("Telefon (optional)", im.phone, false, function (v) { im.phone = v; }));
   }
 
   function openEditor() {

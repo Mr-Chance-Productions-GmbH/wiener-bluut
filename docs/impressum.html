@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Impressum — Wiener Bluut</title>
+  <meta name="description" content="Impressum — Wiener Bluut, Hella Duny & Klaus Schäfer, Berlin.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;0,6..96,600;0,6..96,700;1,6..96,400;1,6..96,500&family=Archivo:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <a id="top"></a>
+
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="index.html">Wiener Bl<span class="uu">uu</span>t</a>
+      <a class="legal-back" href="index.html">Zurück zur Startseite</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="legal">
+      <div class="wrap">
+        <p class="section-label">Rechtliches</p>
+        <h1>Impressum</h1>
+
+        <h2>Angaben gemäß § 5 DDG</h2>
+        <address>
+          <span data-im="name"></span><br>
+          <span data-im="street"></span><br>
+          <span data-im="city"></span><br>
+          Deutschland
+        </address>
+
+        <h2>Kontakt</h2>
+        <p>
+          E-Mail: <a id="im-email" href="#"></a><br>
+          Telefon: <span data-im="phone" data-optional="1"></span>
+        </p>
+
+        <h2>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h2>
+        <address>
+          <span data-im="name"></span> · Anschrift wie oben
+        </address>
+
+        <a class="back" href="index.html">← Zurück zur Startseite</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div>
+        <div class="f-brand">Wiener Bl<span class="uu">uu</span>t</div>
+        <div class="f-note">Wiener Bluut · Hella Duny &amp; Klaus Schäfer · Berlin</div>
+      </div>
+      <div class="f-links">
+        <a href="index.html">Startseite</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Read-only render of the Impressum fields from content.json. Editing happens
+       in the main editor (Setzer), Tab "Impressum"; this page only displays. -->
+  <script>
+    (function () {
+      function fill(key, val, optional) {
+        var txt = val || (optional ? "—" : "[bitte im Editor ausfüllen]");
+        document.querySelectorAll('[data-im="' + key + '"]').forEach(function (el) {
+          el.textContent = txt;
+          el.className = (val || optional) ? "" : "ph-data";
+        });
+      }
+      fetch("content.json", { cache: "no-store" })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var im = d.impressum || {};
+          fill("name", im.name);
+          fill("street", im.street);
+          fill("city", im.city);
+          fill("phone", im.phone, true);
+          var email = (d.kontakt && d.kontakt.email) || "";
+          var a = document.getElementById("im-email");
+          if (email) { a.textContent = email; a.href = "mailto:" + email; }
+          else { a.textContent = "[E-Mail im Kontakt-Tab ausfüllen]"; a.className = "ph-data"; a.removeAttribute("href"); }
+        })
+        .catch(function () {
+          document.querySelectorAll("[data-im]").forEach(function (el) { el.textContent = "—"; });
+        });
+    })();
+  </script>
+</body>
+</html>

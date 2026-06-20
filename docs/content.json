@@ -200,8 +200,14 @@
       },
       {
         "label": "YouTube",
-        "href": "#"
+        "href": "https://www.youtube.com/watch?v=iwFT5eE8r6g"
       }
     ]
+  },
+  "impressum": {
+    "name": "",
+    "street": "",
+    "city": "",
+    "phone": ""
   }
 }
